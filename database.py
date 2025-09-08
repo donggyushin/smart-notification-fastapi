@@ -1,0 +1,24 @@
+import os
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+# Railway에서 DATABASE_URL 환경변수로 제공됨
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# 로컬 개발용 기본값 (필요시 변경)
+if not DATABASE_URL:
+    DATABASE_URL = "postgresql://user:password@localhost:5432/smart_notification"
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+# Dependency to get DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
