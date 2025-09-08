@@ -1,12 +1,11 @@
 from sqlalchemy import Column, String, DateTime, Boolean, Text
 from sqlalchemy.sql import func
 from database import Base
-import uuid
 
 class Device(Base):
     __tablename__ = "devices"
     
-    device_uuid = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()), unique=True, index=True)
+    device_uuid = Column(String, primary_key=True, unique=True, index=True)
     fcm_token = Column(Text, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

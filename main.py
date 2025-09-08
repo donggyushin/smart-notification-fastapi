@@ -12,6 +12,7 @@ app = FastAPI(title="Smart Notification API", version="0.1.0")
 
 # Pydantic models for API
 class DeviceCreate(BaseModel):
+    device_uuid: str
     fcm_token: str
 
 class DeviceResponse(BaseModel):
@@ -39,19 +40,24 @@ async def health_check(db: Session = Depends(get_db)):
 
 @app.post("/devices", response_model=DeviceResponse)
 async def register_device(device: DeviceCreate, db: Session = Depends(get_db)):
-    """디바이스 등록 및 FCM 토큰 저장"""
+    """디바이스 등록 및 FCM 토큰 업데이트"""
     try:
-        # 기존 FCM 토큰이 있는지 확인
-        existing_device = db.query(Device).filter(Device.fcm_token == device.fcm_token).first()
+        # 기존 device_uuid가 있는지 확인
+        existing_device = db.query(Device).filter(Device.device_uuid == device.device_uuid).first()
+        
         if existing_device:
-            # 기존 디바이스 활성화
+            # 기존 디바이스의 FCM 토큰 업데이트
+            existing_device.fcm_token = device.fcm_token
             existing_device.is_active = True
             db.commit()
             db.refresh(existing_device)
             return existing_device
         
         # 새 디바이스 생성
-        new_device = Device(fcm_token=device.fcm_token)
+        new_device = Device(
+            device_uuid=device.device_uuid,
+            fcm_token=device.fcm_token
+        )
         db.add(new_device)
         db.commit()
         db.refresh(new_device)
