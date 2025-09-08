@@ -11,7 +11,6 @@ class FinancialNewsAnalysis:
             inject_date=True, # Automatically inject current date into tasks
             reasoning=True, 
             tools=[SerperDevTool()],
-            allow_code_execution=True,
             llm="gpt-4o",
             verbose=True
         )
@@ -38,5 +37,5 @@ class FinancialNewsAnalysis:
 
 if __name__ == "__main__":
     analysis = FinancialNewsAnalysis()
-    result = analysis.crew().kickoff(inputs={})
+    result = analysis.crew().kickoff()
     print(result)
