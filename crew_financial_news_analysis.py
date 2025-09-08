@@ -1,6 +1,6 @@
 
 from crewai import Agent, Crew, Task, Process
-from crewai_tools import SerperDevTool
+from crewai_tools import SerperDevTool, WebsiteSearchTool
 from models import News
 
 class FinancialNewsAnalysis:
@@ -23,7 +23,7 @@ class FinancialNewsAnalysis:
             backstory="You are a seasoned equity research analyst with deep expertise in fundamental and technical analysis. Having worked at top-tier investment banks for over a decade, you excel at quickly parsing complex financial information, identifying key market drivers, and quantifying potential stock price impacts. Your analytical framework combines quantitative metrics with qualitative assessment to deliver precise investment insights.",
             inject_date=True, # Automatically inject current date into tasks
             reasoning=True, 
-            tools=[SerperDevTool()],
+            tools=[WebsiteSearchTool()],
             llm="gpt-4o",
             verbose=True
         )
