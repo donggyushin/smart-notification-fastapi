@@ -3,7 +3,7 @@ from crewai import Agent, Crew, Task, Process
 from crewai_tools import SerperDevTool
 
 class FinancialNewsAnalysis:
-    def financialNewsResearcher(self) -> Agent:
+    def researcher(self) -> Agent:
         return Agent(
             role="Financial News Researcher",
             goal="Find and search news that have high impact on USA stock marget",
@@ -15,7 +15,7 @@ class FinancialNewsAnalysis:
             verbose=True
         )
     
-    def financialNewsResearch(self) -> Task:
+    def research(self) -> Task:
         return Task(
             description="""
             Read recent 15-20 news related with USA stock market and
@@ -24,13 +24,13 @@ class FinancialNewsAnalysis:
             expected_output="""
             News urls: ["url1", "url2", ...]
             """,
-            agent=self.financialNewsResearcher()
+            agent=self.researcher()
         )
     
     def crew(self) -> Crew:
         return Crew(
-            agents=[self.financialNewsResearcher()],
-            tasks=[self.financialNewsResearch()],
+            agents=[self.researcher()],
+            tasks=[self.research()],
             process=Process.sequential,
             verbose=True
         )
