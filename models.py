@@ -1,6 +1,9 @@
 from sqlalchemy import Column, String, DateTime, Boolean, Text
 from sqlalchemy.sql import func
 from database import Base
+from pydantic import BaseModel
+from typing import List
+from datetime import date
 
 class Device(Base):
     __tablename__ = "devices"
@@ -13,3 +16,11 @@ class Device(Base):
     
     def __repr__(self):
         return f"<Device(device_uuid='{self.device_uuid}', is_active={self.is_active})>"
+
+class News(BaseModel):
+    title: str 
+    summarize: str 
+    url: str 
+    published_date: date 
+    score: int 
+    tickers: List[str]

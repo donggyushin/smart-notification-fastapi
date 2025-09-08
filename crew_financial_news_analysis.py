@@ -1,17 +1,7 @@
 
 from crewai import Agent, Crew, Task, Process
 from crewai_tools import SerperDevTool
-from pydantic import BaseModel
-from typing import List
-from datetime import date
-
-class News(BaseModel):
-    title: str 
-    summarize: str 
-    url: str 
-    published_date: date 
-    score: int 
-    tickers: List[str]
+from models import News
 
 class FinancialNewsAnalysis:
     def researcher(self) -> Agent:
