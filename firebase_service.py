@@ -29,16 +29,9 @@ class FirebaseService:
             logger.info("Firebase already initialized")
         except ValueError:
             # Firebase not initialized, so initialize it
-            firebase_credentials_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
             firebase_credentials_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
-            
-            if firebase_credentials_path and os.path.exists(firebase_credentials_path):
-                # Use service account key file
-                cred = credentials.Certificate(firebase_credentials_path)
-                firebase_admin.initialize_app(cred)
-                logger.info("Firebase initialized with credentials file")
                 
-            elif firebase_credentials_json:
+            if firebase_credentials_json:
                 # Use service account key JSON string (for Railway/Heroku deployment)
                 try:
                     service_account_info = json.loads(firebase_credentials_json)
