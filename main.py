@@ -1,27 +1,13 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
 from database import get_db, engine, Base
-from models import Device
+from models import Device, DeviceCreate, DeviceResponse
 import logging
 
 # 데이터베이스 테이블 생성
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Smart Notification API", version="0.1.0")
-
-# Pydantic models for API
-class DeviceCreate(BaseModel):
-    device_uuid: str
-    fcm_token: str
-
-class DeviceResponse(BaseModel):
-    device_uuid: str
-    fcm_token: str
-    is_active: bool
-    
-    class Config:
-        from_attributes = True
 
 @app.get("/")
 async def root():

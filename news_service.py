@@ -1,0 +1,110 @@
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from models import NewsAnalysis, NewsEntity
+from database import SessionLocal
+from typing import List
+import logging
+
+logger = logging.getLogger(__name__)
+
+def save_news_analysis(news_list: List[NewsEntity]) -> dict:
+    """
+    Save news analysis results to database with duplicate prevention.
+    
+    Args:
+        news_list: List of NewsEntity objects from FinancialNewsAnalysis
+        
+    Returns:
+        dict: Summary of save operation with counts of saved, skipped, and failed items
+    """
+    db = SessionLocal()
+    saved_count = 0
+    skipped_count = 0
+    failed_count = 0
+    
+    try:
+        for news_item in news_list:
+            try:
+                # Check if news with same URL already exists
+                existing_news = db.query(NewsAnalysis).filter(NewsAnalysis.url == news_item.url).first()
+                
+                if existing_news:
+                    logger.info(f"Skipping duplicate news: {news_item.url}")
+                    skipped_count += 1
+                    continue
+                
+                # Create new NewsAnalysis record
+                db_news = NewsAnalysis(
+                    title=news_item.title,
+                    summarize=news_item.summarize,
+                    url=news_item.url,
+                    published_date=news_item.published_date,
+                    score=news_item.score,
+                    tickers=news_item.tickers
+                )
+                
+                db.add(db_news)
+                db.commit()
+                db.refresh(db_news)
+                
+                logger.info(f"Saved news analysis: {news_item.url}")
+                saved_count += 1
+                
+            except IntegrityError as e:
+                # Handle unique constraint violation (duplicate URL)
+                db.rollback()
+                logger.warning(f"Duplicate URL detected, skipping: {news_item.url}")
+                skipped_count += 1
+                
+            except Exception as e:
+                # Handle other database errors
+                db.rollback()
+                logger.error(f"Failed to save news analysis for {news_item.url}: {str(e)}")
+                failed_count += 1
+                
+    finally:
+        db.close()
+    
+    result = {
+        "total_processed": len(news_list),
+        "saved": saved_count,
+        "skipped_duplicates": skipped_count,
+        "failed": failed_count
+    }
+    
+    logger.info(f"News analysis save operation completed: {result}")
+    return result
+
+def get_recent_news_analysis(db: Session, limit: int = 50) -> List[NewsAnalysis]:
+    """
+    Retrieve recent news analysis from database.
+    
+    Args:
+        db: Database session
+        limit: Maximum number of records to return
+        
+    Returns:
+        List of NewsAnalysis records ordered by creation time (newest first)
+    """
+    return db.query(NewsAnalysis).order_by(NewsAnalysis.created_at.desc()).limit(limit).all()
+
+def get_news_by_score_range(db: Session, min_score: int = None, max_score: int = None) -> List[NewsAnalysis]:
+    """
+    Retrieve news analysis filtered by score range.
+    
+    Args:
+        db: Database session
+        min_score: Minimum score filter (inclusive)
+        max_score: Maximum score filter (inclusive)
+        
+    Returns:
+        List of NewsAnalysis records matching score criteria
+    """
+    query = db.query(NewsAnalysis)
+    
+    if min_score is not None:
+        query = query.filter(NewsAnalysis.score >= min_score)
+    if max_score is not None:
+        query = query.filter(NewsAnalysis.score <= max_score)
+        
+    return query.order_by(NewsAnalysis.created_at.desc()).all()

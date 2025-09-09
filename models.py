@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Boolean, Text
+from sqlalchemy import Column, String, DateTime, Boolean, Text, Integer, Date, JSON
 from sqlalchemy.sql import func
 from database import Base
 from pydantic import BaseModel
@@ -17,6 +17,37 @@ class Device(Base):
     def __repr__(self):
         return f"<Device(device_uuid='{self.device_uuid}', is_active={self.is_active})>"
 
+# SQLAlchemy model for database storage
+class NewsAnalysis(Base):
+    __tablename__ = "news_analysis"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(Text, nullable=False)
+    summarize = Column(Text, nullable=False)
+    url = Column(Text, unique=True, nullable=False, index=True)  # Unique constraint for duplicate prevention
+    published_date = Column(Date, nullable=False)
+    score = Column(Integer, nullable=False)
+    tickers = Column(JSON, nullable=False)  # Store list of tickers as JSON
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    def __repr__(self):
+        return f"<NewsAnalysis(url='{self.url}', score={self.score}, tickers={self.tickers})>"
+
+# Pydantic models for Device API
+class DeviceCreate(BaseModel):
+    device_uuid: str
+    fcm_token: str
+
+class DeviceResponse(BaseModel):
+    device_uuid: str
+    fcm_token: str
+    is_active: bool
+    
+    class Config:
+        from_attributes = True
+
+# Pydantic model for API responses and CrewAI output
 class NewsEntity(BaseModel):
     title: str 
     summarize: str 
