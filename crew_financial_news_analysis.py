@@ -2,6 +2,7 @@
 from crewai import Agent, Crew, Task, Process
 from crewai_tools import SerperDevTool, WebsiteSearchTool
 from models import News
+from typing import List
 
 class FinancialNewsAnalysis:
     def researcher(self) -> Agent:
@@ -81,15 +82,21 @@ class FinancialNewsAnalysis:
             - Score -8 to -10: Major negative catalysts (regulatory penalties, accounting issues, leadership departures)
             """,
             expected_output="""
-            Structured analysis conforming to the News Pydantic model with:
-            - title: Clear, descriptive headline
-            - summarize: Concise 2-3 sentence investment summary
-            - url: Original news source URL
-            - published_date: Publication date in YYYY-MM-DD format
-            - score: Integer from -10 to +10 representing market impact
-            - tickers: List of affected stock symbols (e.g., ["AAPL", "MSFT", "GOOGL"])
+            A list of News objects, with each article analyzed and structured conforming to the News Pydantic model:
+            [
+                {
+                    "title": "Clear, descriptive headline",
+                    "summarize": "Concise 2-3 sentence investment summary",
+                    "url": "Original news source URL",
+                    "published_date": "Publication date in YYYY-MM-DD format",
+                    "score": "Integer from -10 to +10 representing market impact",
+                    "tickers": ["List of affected stock symbols"]
+                },
+                ...
+            ]
+            Analyze ALL provided URLs from the research task.
             """,
-            output_pydantic=News,
+            output_pydantic=List[News],
             agent=self.analyst()
         )
     
