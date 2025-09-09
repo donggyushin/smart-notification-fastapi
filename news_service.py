@@ -108,3 +108,60 @@ def get_news_by_score_range(db: Session, min_score: int = None, max_score: int =
         query = query.filter(NewsAnalysis.score <= max_score)
         
     return query.order_by(NewsAnalysis.created_at.desc()).all()
+
+def get_news_feed_with_cursor(
+    db: Session,
+    cursor_id: int = None,
+    limit: int = 20,
+    min_score: int = None,
+    max_score: int = None
+) -> dict:
+    """
+    Get news feed using cursor-based pagination for infinite scroll.
+    
+    Args:
+        db: Database session
+        cursor_id: Last news ID from previous request (for next page)
+        limit: Number of items to return
+        min_score: Minimum score filter (inclusive)
+        max_score: Maximum score filter (inclusive)
+        
+    Returns:
+        dict: Cursor-based paginated news data
+        {
+            "items": List[NewsAnalysis],
+            "next_cursor_id": int or None,
+            "has_more": bool,
+            "limit": int
+        }
+    """
+    # Build base query
+    query = db.query(NewsAnalysis)
+    
+    # Apply score filters
+    if min_score is not None:
+        query = query.filter(NewsAnalysis.score >= min_score)
+    if max_score is not None:
+        query = query.filter(NewsAnalysis.score <= max_score)
+    
+    # Apply cursor filter (get items with ID less than cursor for descending order)
+    if cursor_id is not None:
+        query = query.filter(NewsAnalysis.id < cursor_id)
+    
+    # Order by ID descending (newest first) and get one extra to check if there's more
+    items = query.order_by(NewsAnalysis.id.desc()).limit(limit + 1).all()
+    
+    # Check if there are more items
+    has_more = len(items) > limit
+    if has_more:
+        items = items[:limit]  # Remove the extra item
+    
+    # Get next cursor (ID of last item)
+    next_cursor_id = items[-1].id if items and has_more else None
+    
+    return {
+        "items": items,
+        "next_cursor_id": next_cursor_id,
+        "has_more": has_more,
+        "limit": limit
+    }
