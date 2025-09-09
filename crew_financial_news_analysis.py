@@ -96,7 +96,7 @@ class FinancialNewsAnalysis:
             ]
             Analyze ALL provided URLs from the research task.
             """,
-            output_pydantic=List[News],
+            output_pydantic=News,
             agent=self.analyst()
         )
     
