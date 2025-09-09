@@ -1,8 +1,7 @@
 
 from crewai import Agent, Crew, Task, Process
 from crewai_tools import SerperDevTool, WebsiteSearchTool
-from models import News
-from typing import List
+from models import NewsEntity
 
 class FinancialNewsAnalysis:
     def researcher(self) -> Agent:
@@ -96,7 +95,7 @@ class FinancialNewsAnalysis:
             ]
             Analyze ALL provided URLs from the research task.
             """,
-            output_pydantic=News,
+            output_pydantic=NewsEntity,
             agent=self.analyst()
         )
     

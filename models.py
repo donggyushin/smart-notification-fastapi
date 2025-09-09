@@ -17,7 +17,7 @@ class Device(Base):
     def __repr__(self):
         return f"<Device(device_uuid='{self.device_uuid}', is_active={self.is_active})>"
 
-class News(BaseModel):
+class NewsEntity(BaseModel):
     title: str 
     summarize: str 
     url: str 
