@@ -4,13 +4,33 @@ from database import get_db, engine, Base
 from models import DeviceCreate, DeviceResponse, NewsFeedResponse
 from device_service import register_device, get_active_devices
 from news_service import get_news_feed_with_cursor
+from scheduler_service import news_scheduler
 from typing import Optional
 import logging
+import atexit
 
 # 데이터베이스 테이블 생성
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Smart Notification API", version="0.1.0")
+
+# Startup event to initialize scheduler
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    logging.info("Starting Smart Notification API...")
+    # Start the news scheduler
+    news_scheduler.start_scheduler()
+
+# Shutdown event to cleanup scheduler
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup services on shutdown"""
+    logging.info("Shutting down Smart Notification API...")
+    news_scheduler.stop_scheduler()
+
+# Also register cleanup on process exit
+atexit.register(news_scheduler.stop_scheduler)
 
 @app.get("/")
 async def root():
@@ -65,6 +85,22 @@ async def get_news_feed_endpoint(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch news feed: {str(e)}")
+
+@app.get("/admin/scheduler/status")
+async def get_scheduler_status():
+    """스케줄러 상태 조회 (관리자용)"""
+    return news_scheduler.get_scheduler_status()
+
+@app.post("/admin/scheduler/run-now")
+async def trigger_news_analysis():
+    """뉴스 분석 수동 실행 (관리자용)"""
+    try:
+        # Run the task in background to avoid timeout
+        import asyncio
+        asyncio.create_task(news_scheduler.daily_news_analysis_task())
+        return {"message": "News analysis task started in background"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to trigger news analysis: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
