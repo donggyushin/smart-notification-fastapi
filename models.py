@@ -47,6 +47,26 @@ class DeviceResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# Pydantic models for News API responses
+class NewsResponse(BaseModel):
+    id: int
+    title: str 
+    summarize: str 
+    url: str 
+    published_date: date 
+    score: int 
+    tickers: List[str]
+    created_at: str
+    
+    class Config:
+        from_attributes = True
+
+class NewsFeedResponse(BaseModel):
+    items: List[NewsResponse]
+    next_cursor_id: int = None
+    has_more: bool
+    limit: int
+
 # Pydantic model for API responses and CrewAI output
 class NewsEntity(BaseModel):
     title: str 
