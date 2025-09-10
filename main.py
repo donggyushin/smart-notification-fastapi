@@ -2,9 +2,10 @@ from fastapi import FastAPI, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import get_db, engine, Base
 from models import DeviceCreate, DeviceResponse, NewsFeedResponse
-from device_service import register_device, get_active_devices
+from device_service import register_device, get_active_devices, get_device_tokens
 from news_service import get_news_feed_with_cursor
 from scheduler_service import news_scheduler
+from firebase_service import firebase_service
 from typing import Optional
 import logging
 import atexit
@@ -101,6 +102,57 @@ async def trigger_news_analysis():
         return {"message": "News analysis task started in background"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to trigger news analysis: {str(e)}")
+
+@app.post("/admin/test/push-notification")
+async def test_push_notification(
+    title: str = "📱 Test Notification",
+    body: str = "This is a test push notification to all registered devices!",
+    db: Session = Depends(get_db)
+):
+    """테스트용 푸시 알림 전송 - 모든 활성 디바이스에 알림 발송 (관리자용)"""
+    try:
+        # Get all active device tokens
+        tokens = get_device_tokens(db, active_only=True)
+        
+        if not tokens:
+            return {
+                "message": "No active devices found",
+                "success_count": 0,
+                "failure_count": 0,
+                "total_devices": 0
+            }
+        
+        # Additional data payload for test notification
+        data = {
+            "type": "test_notification",
+            "test_id": f"test_{int(__import__('time').time())}",
+            "timestamp": __import__('datetime').datetime.now().isoformat()
+        }
+        
+        # Send multicast notification to all devices
+        result = await firebase_service.send_multicast_notification(
+            tokens=tokens,
+            title=title,
+            body=body,
+            data=data
+        )
+        
+        return {
+            "message": f"Test notification sent to {len(tokens)} devices",
+            "success_count": result["success_count"],
+            "failure_count": result["failure_count"],
+            "total_devices": len(tokens),
+            "failed_tokens_count": len(result["failed_tokens"]),
+            "notification_details": {
+                "title": title,
+                "body": body,
+                "data": data
+            }
+        }
+        
+    except Exception as e:
+        logging.error(f"Failed to send test notification: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to send test notification: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
