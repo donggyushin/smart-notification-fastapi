@@ -159,8 +159,23 @@ def get_news_feed_with_cursor(
     # Get next cursor (ID of last item)
     next_cursor_id = items[-1].id if items and has_more else None
     
+    # Convert datetime objects to strings for API response
+    serialized_items = []
+    for item in items:
+        item_dict = {
+            "id": item.id,
+            "title": item.title,
+            "summarize": item.summarize,
+            "url": item.url,
+            "published_date": item.published_date,
+            "score": item.score,
+            "tickers": item.tickers,
+            "created_at": item.created_at.isoformat()
+        }
+        serialized_items.append(item_dict)
+    
     return {
-        "items": items,
+        "items": serialized_items,
         "next_cursor_id": next_cursor_id,
         "has_more": has_more,
         "limit": limit

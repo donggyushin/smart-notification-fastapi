@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import json
 from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -10,6 +11,7 @@ from news_service import save_news_analysis
 from device_service import get_device_tokens
 from firebase_service import firebase_service
 from database import SessionLocal
+from models import NewsEntity
 
 logger = logging.getLogger(__name__)
 
@@ -40,17 +42,46 @@ class NewsSchedulerService:
                 
             # Extract the actual data from CrewOutput object
             if hasattr(result, 'raw'):
-                news_data = result.raw
+                raw_data = result.raw
             elif hasattr(result, 'output'):
-                news_data = result.output
+                raw_data = result.output
             else:
-                news_data = result
+                raw_data = result
+            
+            # Parse JSON string to list of dictionaries if needed
+            if isinstance(raw_data, str):
+                try:
+                    parsed_data = json.loads(raw_data)
+                except json.JSONDecodeError:
+                    logger.error(f"Failed to parse JSON from crew output: {raw_data}")
+                    return
+            else:
+                parsed_data = raw_data
+            
+            # Convert to NewsEntity objects
+            news_entities = []
+            if isinstance(parsed_data, list):
+                for item in parsed_data:
+                    if isinstance(item, dict):
+                        news_entity = NewsEntity(
+                            title=item.get('title', ''),
+                            summarize=item.get('summarize', ''),
+                            url=item.get('url', ''),
+                            published_date=item.get('published_date', ''),
+                            score=item.get('score', 0),
+                            tickers=item.get('tickers', [])
+                        )
+                        news_entities.append(news_entity)
+            
+            if not news_entities:
+                logger.warning("No valid news entities found after parsing")
+                return
                 
-            logger.info(f"Analysis completed. Processing {len(news_data) if hasattr(news_data, '__len__') else 'unknown number of'} news items...")
+            logger.info(f"Analysis completed. Processing {len(news_entities)} news items...")
             
             # Step 2: Save to database
             logger.info("Saving news analysis to database...")
-            save_result = save_news_analysis(news_data)
+            save_result = save_news_analysis(news_entities)
             logger.info(f"Database save completed: {save_result}")
             
             # Only send notifications if we saved new items

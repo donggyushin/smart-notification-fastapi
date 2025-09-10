@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, DateTime, Boolean, Text, Integer, Date, J
 from sqlalchemy.sql import func
 from database import Base
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from datetime import date
 
 class Device(Base):
@@ -63,7 +63,7 @@ class NewsResponse(BaseModel):
 
 class NewsFeedResponse(BaseModel):
     items: List[NewsResponse]
-    next_cursor_id: int = None
+    next_cursor_id: Optional[int] = None
     has_more: bool
     limit: int
 

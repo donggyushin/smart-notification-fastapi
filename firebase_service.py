@@ -115,7 +115,24 @@ class FirebaseService:
                 data=data or {}
             )
             
-            response = messaging.send_multicast(message)
+            # Try send_multicast first, then fallback to send_each_for_multicast if needed
+            if hasattr(messaging, 'send_multicast'):
+                try:
+                    response = messaging.send_multicast(message)
+                    logger.info("Successfully used send_multicast method")
+                except Exception as multicast_error:
+                    logger.warning(f"send_multicast failed: {multicast_error}, trying send_each_for_multicast")
+                    if hasattr(messaging, 'send_each_for_multicast'):
+                        response = messaging.send_each_for_multicast(message)
+                        logger.info("Successfully used send_each_for_multicast method")
+                    else:
+                        raise multicast_error
+            elif hasattr(messaging, 'send_each_for_multicast'):
+                response = messaging.send_each_for_multicast(message)
+                logger.info("Used send_each_for_multicast method")
+            else:
+                logger.error("No multicast send methods available, falling back to individual sends")
+                return await self._send_individual_notifications(tokens, title, body, data)
             
             failed_tokens = []
             if response.failure_count > 0:
@@ -176,6 +193,32 @@ class FirebaseService:
         except Exception as e:
             logger.error(f"Error sending topic notification to {topic}: {str(e)}")
             return False
+    
+    async def _send_individual_notifications(
+        self,
+        tokens: List[str],
+        title: str,
+        body: str,
+        data: Optional[Dict[str, str]] = None
+    ) -> Dict[str, int]:
+        """
+        Fallback method to send notifications individually when multicast is not available
+        """
+        success_count = 0
+        failed_tokens = []
+        
+        for token in tokens:
+            success = await self.send_notification(token, title, body, data)
+            if success:
+                success_count += 1
+            else:
+                failed_tokens.append(token)
+        
+        return {
+            "success_count": success_count,
+            "failure_count": len(failed_tokens),
+            "failed_tokens": failed_tokens
+        }
 
 # Singleton instance
 firebase_service = FirebaseService()
