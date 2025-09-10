@@ -115,23 +115,12 @@ class FirebaseService:
                 data=data or {}
             )
             
-            # Try send_multicast first, then fallback to send_each_for_multicast if needed
-            if hasattr(messaging, 'send_multicast'):
-                try:
-                    response = messaging.send_multicast(message)
-                    logger.info("Successfully used send_multicast method")
-                except Exception as multicast_error:
-                    logger.warning(f"send_multicast failed: {multicast_error}, trying send_each_for_multicast")
-                    if hasattr(messaging, 'send_each_for_multicast'):
-                        response = messaging.send_each_for_multicast(message)
-                        logger.info("Successfully used send_each_for_multicast method")
-                    else:
-                        raise multicast_error
-            elif hasattr(messaging, 'send_each_for_multicast'):
+            # Use send_each_for_multicast (recommended method)
+            if hasattr(messaging, 'send_each_for_multicast'):
                 response = messaging.send_each_for_multicast(message)
                 logger.info("Used send_each_for_multicast method")
             else:
-                logger.error("No multicast send methods available, falling back to individual sends")
+                logger.error("send_each_for_multicast not available, falling back to individual sends")
                 return await self._send_individual_notifications(tokens, title, body, data)
             
             failed_tokens = []
