@@ -148,7 +148,7 @@ class NewsSchedulerService:
             db.close()
     
     def start_scheduler(self):
-        """Start the scheduler with daily 5 PM KST task"""
+        """Start the scheduler with daily 5 PM and 10 PM KST tasks"""
         try:
             # Schedule daily task at 5 PM Korea time
             self.scheduler.add_job(
@@ -158,8 +158,21 @@ class NewsSchedulerService:
                     minute=0,
                     timezone=self.korea_tz
                 ),
-                id='daily_news_analysis',
-                name='Daily Financial News Analysis',
+                id='daily_news_analysis_5pm',
+                name='Daily Financial News Analysis (5 PM)',
+                replace_existing=True
+            )
+            
+            # Schedule daily task at 10 PM Korea time
+            self.scheduler.add_job(
+                self.daily_news_analysis_task,
+                trigger=CronTrigger(
+                    hour=22,  # 10 PM
+                    minute=0,
+                    timezone=self.korea_tz
+                ),
+                id='daily_news_analysis_10pm',
+                name='Daily Financial News Analysis (10 PM)',
                 replace_existing=True
             )
             
@@ -175,13 +188,17 @@ class NewsSchedulerService:
             
             self.scheduler.start()
             logger.info("News scheduler started successfully")
-            logger.info(f"Daily news analysis scheduled for 5:00 PM Korea time")
+            logger.info(f"Daily news analysis scheduled for 5:00 PM and 10:00 PM Korea time")
             
-            # Log next run time
-            job = self.scheduler.get_job('daily_news_analysis')
-            if job:
-                next_run = job.next_run_time
-                logger.info(f"Next scheduled run: {next_run}")
+            # Log next run times
+            job_5pm = self.scheduler.get_job('daily_news_analysis_5pm')
+            job_10pm = self.scheduler.get_job('daily_news_analysis_10pm')
+            if job_5pm:
+                next_run_5pm = job_5pm.next_run_time
+                logger.info(f"Next 5 PM run: {next_run_5pm}")
+            if job_10pm:
+                next_run_10pm = job_10pm.next_run_time
+                logger.info(f"Next 10 PM run: {next_run_10pm}")
                 
         except Exception as e:
             logger.error(f"Failed to start scheduler: {str(e)}", exc_info=True)
