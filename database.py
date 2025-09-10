@@ -19,6 +19,10 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
+# Function to get database URL for Alembic
+def get_database_url():
+    return DATABASE_URL
+
 # Dependency to get DB session
 def get_db():
     db = SessionLocal()

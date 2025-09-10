@@ -87,7 +87,7 @@ class FinancialNewsAnalysis:
                     "title": "Clear, descriptive headline",
                     "summarize": "Concise 2-3 sentence investment summary",
                     "url": "Original news source URL",
-                    "published_date": "Publication date in YYYY-MM-DD HH:mm:ss (UTC) format",
+                    "published_date": "Publication date in YYYY-MM-DD HH:mm:ss format and timezone is UTC",
                     "score": "Integer from -10 to +10 representing market impact",
                     "tickers": ["List of affected stock symbols"]
                 },

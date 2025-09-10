@@ -78,8 +78,13 @@ class NewsSchedulerService:
                             # Parse published_date string to datetime object
                             published_date_str = item.get('published_date', '')
                             if published_date_str:
+                                # Clean the date string by removing (UTC) suffix
+                                cleaned_date_str = published_date_str.replace(' (UTC)', '').strip()
                                 # Use dateutil parser to handle various datetime formats
-                                published_date = parser.parse(published_date_str)
+                                published_date = parser.parse(cleaned_date_str)
+                                # Ensure timezone is UTC
+                                if published_date.tzinfo is None:
+                                    published_date = published_date.replace(tzinfo=pytz.UTC)
                             else:
                                 # Default to current time if no date provided
                                 published_date = datetime.now(pytz.UTC)
@@ -102,8 +107,13 @@ class NewsSchedulerService:
                     # Parse published_date string to datetime object
                     published_date_str = parsed_data.get('published_date', '')
                     if published_date_str:
+                        # Clean the date string by removing (UTC) suffix
+                        cleaned_date_str = published_date_str.replace(' (UTC)', '').strip()
                         # Use dateutil parser to handle various datetime formats
-                        published_date = parser.parse(published_date_str)
+                        published_date = parser.parse(cleaned_date_str)
+                        # Ensure timezone is UTC
+                        if published_date.tzinfo is None:
+                            published_date = published_date.replace(tzinfo=pytz.UTC)
                     else:
                         # Default to current time if no date provided
                         published_date = datetime.now(pytz.UTC)
