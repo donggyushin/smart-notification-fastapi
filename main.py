@@ -1,9 +1,9 @@
 from fastapi import FastAPI, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import get_db, engine, Base
-from models import DeviceCreate, DeviceResponse, NewsFeedResponse
+from models import DeviceCreate, DeviceResponse, NewsFeedResponse, NewsResponse
 from device_service import register_device, get_active_devices, get_device_tokens
-from news_service import get_news_feed_with_cursor
+from news_service import get_news_feed_with_cursor, get_news_by_id
 from scheduler_service import news_scheduler
 from firebase_service import firebase_service
 from typing import Optional
@@ -86,6 +86,30 @@ async def get_news_feed_endpoint(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch news feed: {str(e)}")
+
+@app.get("/news/{news_id}", response_model=NewsResponse)
+async def get_news_item_endpoint(news_id: int, db: Session = Depends(get_db)):
+    """단일 뉴스 아이템 조회"""
+    try:
+        news_item = get_news_by_id(db, news_id)
+        if not news_item:
+            raise HTTPException(status_code=404, detail="News item not found")
+        
+        # Convert to response format
+        return NewsResponse(
+            id=news_item.id,
+            title=news_item.title,
+            summarize=news_item.summarize,
+            url=news_item.url,
+            published_date=news_item.published_date,
+            score=news_item.score,
+            tickers=news_item.tickers,
+            created_at=news_item.created_at.isoformat()
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch news item: {str(e)}")
 
 @app.get("/admin/scheduler/status")
 async def get_scheduler_status():

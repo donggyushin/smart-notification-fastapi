@@ -180,3 +180,16 @@ def get_news_feed_with_cursor(
         "has_more": has_more,
         "limit": limit
     }
+
+def get_news_by_id(db: Session, news_id: int) -> NewsAnalysis:
+    """
+    Retrieve a single news item by its ID.
+    
+    Args:
+        db: Database session
+        news_id: ID of the news item to retrieve
+        
+    Returns:
+        NewsAnalysis record or None if not found
+    """
+    return db.query(NewsAnalysis).filter(NewsAnalysis.id == news_id).first()
