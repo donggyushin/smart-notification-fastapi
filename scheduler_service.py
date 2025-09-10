@@ -38,11 +38,19 @@ class NewsSchedulerService:
                 logger.warning("No news analysis results received")
                 return
                 
-            logger.info(f"Analysis completed. Processing {len(result)} news items...")
+            # Extract the actual data from CrewOutput object
+            if hasattr(result, 'raw'):
+                news_data = result.raw
+            elif hasattr(result, 'output'):
+                news_data = result.output
+            else:
+                news_data = result
+                
+            logger.info(f"Analysis completed. Processing {len(news_data) if hasattr(news_data, '__len__') else 'unknown number of'} news items...")
             
             # Step 2: Save to database
             logger.info("Saving news analysis to database...")
-            save_result = save_news_analysis(result)
+            save_result = save_news_analysis(news_data)
             logger.info(f"Database save completed: {save_result}")
             
             # Only send notifications if we saved new items
