@@ -11,13 +11,6 @@ A FastAPI-based smart notification system with device management and AI-powered 
 - **Railway Deployment**: Production-ready deployment configuration
 - **Python 3.13**: Latest Python version with UV package manager
 
-## API Endpoints
-
-- `GET /` - Hello World message
-- `GET /health` - Health check with database status
-- `POST /devices` - Register/update device with FCM token
-- `GET /devices` - Retrieve all active devices
-
 ## AI News Analysis System
 
 Autonomous financial news analysis using CrewAI agents:
@@ -104,20 +97,6 @@ FIRECRAWL_API_KEY=fc-...    # Web scraping capability
 - **Database**: PostgreSQL (production) / SQLite (development)
 - **AI Framework**: CrewAI with OpenAI GPT-4o
 - **Web Scraping**: Firecrawl API v2 for dynamic content
-
-## Project Structure
-
-```
-├── main.py                    # FastAPI application with device management
-├── crew_news_analysis.py      # AI-powered news analysis system
-├── database.py               # SQLAlchemy configuration
-├── models.py                 # Database models (Device)
-├── pyproject.toml           # Project dependencies and configuration
-├── railway.toml             # Railway deployment settings
-├── Procfile                 # Alternative platform deployment
-├── .env.example             # Environment template
-└── CLAUDE.md                # Development guidance for Claude Code
-```
 
 ## License
 
