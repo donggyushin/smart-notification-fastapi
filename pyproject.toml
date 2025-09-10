@@ -20,4 +20,5 @@ dependencies = [
     "firebase-admin==6.5.0",
     "apscheduler>=3.11.0",
     "pytz>=2025.2",
+    "python-dateutil>=2.9.0.post0",
 ]

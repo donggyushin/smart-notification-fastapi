@@ -167,7 +167,7 @@ def get_news_feed_with_cursor(
             "title": item.title,
             "summarize": item.summarize,
             "url": item.url,
-            "published_date": item.published_date,
+            "published_date": item.published_date.isoformat() if hasattr(item.published_date, 'isoformat') else item.published_date,
             "score": item.score,
             "tickers": item.tickers,
             "created_at": item.created_at.isoformat()

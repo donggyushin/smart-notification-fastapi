@@ -3,7 +3,7 @@ from sqlalchemy.sql import func
 from database import Base
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import date
+from datetime import date, datetime
 
 class Device(Base):
     __tablename__ = "devices"
@@ -25,7 +25,7 @@ class NewsAnalysis(Base):
     title = Column(Text, nullable=False)
     summarize = Column(Text, nullable=False)
     url = Column(Text, unique=True, nullable=False, index=True)  # Unique constraint for duplicate prevention
-    published_date = Column(Date, nullable=False)
+    published_date = Column(DateTime(timezone=True), nullable=False)
     score = Column(Integer, nullable=False)
     tickers = Column(JSON, nullable=False)  # Store list of tickers as JSON
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -53,7 +53,7 @@ class NewsResponse(BaseModel):
     title: str 
     summarize: str 
     url: str 
-    published_date: date 
+    published_date: datetime 
     score: int 
     tickers: List[str]
     created_at: str
@@ -72,6 +72,6 @@ class NewsEntity(BaseModel):
     title: str 
     summarize: str 
     url: str 
-    published_date: date 
+    published_date: datetime 
     score: int 
     tickers: List[str]
