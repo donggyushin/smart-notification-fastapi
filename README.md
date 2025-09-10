@@ -81,18 +81,6 @@ FIRECRAWL_API_KEY=fc-...    # Web scraping capability
 - Database falls back to SQLite for local development
 - All tables created automatically on startup
 
-## Deployment
-
-### Railway
-
-This project is optimized for Railway deployment:
-Railway auto-detects `railway.toml` and deploys automatically
-
-**Features:**
-
-- Automatic news analysis system
-- Save structured data
-
 ## Architecture
 
 ### FastAPI Service
