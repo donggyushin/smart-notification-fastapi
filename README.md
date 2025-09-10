@@ -21,7 +21,8 @@ A FastAPI-based smart notification system with device management and AI-powered 
 ## AI News Analysis System
 
 Autonomous financial news analysis using CrewAI agents:
-- **Data Sources**: RSS feeds + web scraping (Yahoo Finance, CNBC, MarketWatch)
+
+- **Data Sources**: web scraping (Google, Yahoo Finance, CNBC, MarketWatch)
 - **AI Agents**: News collection, impact evaluation, filtering, and data formatting
 - **Output**: Structured JSON with impact scores, affected tickers, and trading insights
 
@@ -59,25 +60,7 @@ uv run python main.py
 uv run python crew_news_analysis.py
 ```
 
-The API will be available at `http://localhost:8000`
-
-### Testing
-
-```bash
-# Test the root endpoint
-curl http://localhost:8000/
-
-# Test the health endpoint  
-curl http://localhost:8000/health
-
-# Register a device
-curl -X POST http://localhost:8000/devices \
-  -H "Content-Type: application/json" \
-  -d '{"device_uuid": "unique-device-id", "fcm_token": "your_fcm_token_here"}'
-
-# Get all active devices
-curl http://localhost:8000/devices
-```
+The API will be available at `http://0.0.0.0:8000`
 
 ## Environment Configuration
 
@@ -93,43 +76,36 @@ FIRECRAWL_API_KEY=fc-...    # Web scraping capability
 ```
 
 ### Local Development
+
 - Uses `.env` file with python-dotenv
 - Database falls back to SQLite for local development
 - All tables created automatically on startup
 
 ## Deployment
 
-### Railway (Recommended)
+### Railway
 
 This project is optimized for Railway deployment:
-
-1. Connect your GitHub repository to Railway
-2. Add a PostgreSQL service
-3. Set environment variables for OpenAI and Firecrawl API keys
-4. Railway auto-detects `railway.toml` and deploys automatically
+Railway auto-detects `railway.toml` and deploys automatically
 
 **Features:**
-- Automatic database provisioning
-- Health check endpoint monitoring
-- Auto-restart on failures
-- Environment variable injection
 
-### Alternative Platforms
-
-- **Heroku**: Use included `Procfile`
-- **Other**: Ensure `DATABASE_URL` and `$PORT` environment variables are set
+- Automatic news analysis system
+- Save structured data
 
 ## Architecture
 
 ### FastAPI Service
+
 - **Device Management**: UUID-based device registration with FCM tokens
 - **Database**: SQLAlchemy ORM with automatic table creation
 - **Health Monitoring**: Database connectivity verification
 - **API Documentation**: Auto-generated OpenAPI/Swagger docs at `/docs`
 
 ### AI News Analysis
+
 - **Multi-Agent System**: CrewAI framework with specialized agents
-- **Data Collection**: Hybrid RSS + web scraping approach
+- **Data Collection**: web scraping approach
 - **Impact Scoring**: Quantitative 1-10 scale with confidence levels
 - **Structured Output**: Production-ready JSON for database storage
 
