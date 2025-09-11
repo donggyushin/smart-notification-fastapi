@@ -4,8 +4,8 @@ from crewai_tools import SerperDevTool, WebsiteSearchTool
 from models import NewsEntity
 
 class FinancialNewsAnalysis:
-    def researcher(self) -> Agent:
-        return Agent(
+
+    researcher_agent = Agent(
             role="Financial News Researcher",
             goal="Discover and curate high-impact financial news that could significantly influence US stock market movements and investor sentiment",
             backstory="You are an experienced financial journalist with 15+ years covering Wall Street. You have an exceptional ability to identify breaking news, earnings reports, regulatory changes, and market-moving events before they become mainstream. Your network spans across major financial institutions, and you understand which news sources deliver the most reliable and timely market intelligence.",
@@ -16,8 +16,7 @@ class FinancialNewsAnalysis:
             verbose=True
         )
 
-    def analyst(self) -> Agent:
-        return Agent(
+    analyst_agent = Agent(
             role="Financial News Analyst",
             goal="Transform raw financial news into actionable insights by analyzing market impact, identifying affected securities, and providing precise sentiment scoring with comprehensive summaries",
             backstory="You are a seasoned equity research analyst with deep expertise in fundamental and technical analysis. Having worked at top-tier investment banks for over a decade, you excel at quickly parsing complex financial information, identifying key market drivers, and quantifying potential stock price impacts. Your analytical framework combines quantitative metrics with qualitative assessment to deliver precise investment insights.",
@@ -28,8 +27,7 @@ class FinancialNewsAnalysis:
             verbose=True
         )
 
-    def research(self) -> Task:
-        return Task(
+    research_task = Task(
             description="""
             Conduct comprehensive research to identify 15-20 recent financial news articles that could significantly impact US stock market performance. Focus on:
             - Breaking earnings reports and guidance updates
@@ -50,13 +48,12 @@ class FinancialNewsAnalysis:
             ]
             Each URL should represent news with significant potential to move individual stocks or broader market indices.
             """,
-            agent=self.researcher()
+            agent=researcher_agent
         )
 
-    def analyze(self) -> Task:
-        return Task(
+    analyze_task = Task(
             description="""
-            Perform deep analysis of each provided news URL to extract actionable investment insights:
+            Using the URLs provided by the research task, perform deep analysis of each news URL to extract actionable investment insights:
 
             1. Content Analysis:
                - Read full article content, comments, and engagement metrics
@@ -96,13 +93,16 @@ class FinancialNewsAnalysis:
             Analyze ALL provided URLs from the research task.
             """,
             output_pydantic=NewsEntity,
-            agent=self.analyst()
+            agent=analyst_agent,
+            context=[research_task]
         )
 
+
     def crew(self) -> Crew:
+
         return Crew(
-            agents=[self.researcher(), self.analyst()],
-            tasks=[self.research(), self.analyze()],
+            agents=[self.researcher_agent, self.analyst_agent],
+            tasks=[self.research_task, self.analyze_task],
             process=Process.sequential,
             verbose=True
         )

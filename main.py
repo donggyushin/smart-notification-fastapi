@@ -1,3 +1,8 @@
+import logging
+import atexit
+from contextlib import asynccontextmanager
+from typing import Optional
+
 from fastapi import FastAPI, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import get_db, engine, Base
@@ -6,31 +11,26 @@ from device_service import register_device, get_active_devices, get_device_token
 from news_service import get_news_feed_with_cursor, get_news_by_id
 from scheduler_service import news_scheduler
 from firebase_service import firebase_service
-from typing import Optional
-import logging
-import atexit
 
 # 데이터베이스 테이블 생성
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Smart Notification API", version="0.1.0")
-
-# Startup event to initialize scheduler
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup"""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan events"""
+    # Startup
     logging.info("Starting Smart Notification API...")
-    # Start the news scheduler
     news_scheduler.start_scheduler()
 
-# Shutdown event to cleanup scheduler
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup services on shutdown"""
+    yield
+
+    # Shutdown
     logging.info("Shutting down Smart Notification API...")
     news_scheduler.stop_scheduler()
 
-# Also register cleanup on process exit
+app = FastAPI(title="Smart Notification API", version="0.1.0", lifespan=lifespan)
+
+# Also register cleanup on process exit as fallback
 atexit.register(news_scheduler.stop_scheduler)
 
 @app.get("/")
@@ -74,7 +74,7 @@ async def get_news_feed_endpoint(
         # Validate score range
         if min_score is not None and max_score is not None and min_score > max_score:
             raise HTTPException(status_code=400, detail="min_score cannot be greater than max_score")
-        
+
         result = get_news_feed_with_cursor(
             db=db,
             cursor_id=cursor_id,
@@ -83,7 +83,7 @@ async def get_news_feed_endpoint(
             max_score=max_score
         )
         return result
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch news feed: {str(e)}")
 
@@ -94,7 +94,7 @@ async def get_news_item_endpoint(news_id: int, db: Session = Depends(get_db)):
         news_item = get_news_by_id(db, news_id)
         if not news_item:
             raise HTTPException(status_code=404, detail="News item not found")
-        
+
         # Convert to response format
         return NewsResponse(
             id=news_item.id,
@@ -137,7 +137,7 @@ async def test_push_notification(
     try:
         # Get all active device tokens
         tokens = get_device_tokens(db, active_only=True)
-        
+
         if not tokens:
             return {
                 "message": "No active devices found",
@@ -145,14 +145,14 @@ async def test_push_notification(
                 "failure_count": 0,
                 "total_devices": 0
             }
-        
+
         # Additional data payload for test notification
         data = {
             "type": "test_notification",
             "test_id": f"test_{int(__import__('time').time())}",
             "timestamp": __import__('datetime').datetime.now().isoformat()
         }
-        
+
         # Send multicast notification to all devices
         result = await firebase_service.send_multicast_notification(
             tokens=tokens,
@@ -160,7 +160,7 @@ async def test_push_notification(
             body=body,
             data=data
         )
-        
+
         return {
             "message": f"Test notification sent to {len(tokens)} devices",
             "success_count": result["success_count"],
@@ -173,7 +173,7 @@ async def test_push_notification(
                 "data": data
             }
         }
-        
+
     except Exception as e:
         logging.error(f"Failed to send test notification: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to send test notification: {str(e)}")

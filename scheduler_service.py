@@ -52,12 +52,23 @@ class NewsSchedulerService:
             # Parse JSON string to list of dictionaries if needed
             if isinstance(raw_data, str):
                 try:
+                    # First, try to parse as normal JSON
                     parsed_data = json.loads(raw_data)
-                except json.JSONDecodeError:
-                    logger.error(f"Failed to parse JSON from crew output: {raw_data}")
-                    return
+                    logger.info(f"Successfully parsed JSON. Type: {type(parsed_data)}")
+                except json.JSONDecodeError as e:
+                    logger.error(f"JSON parse error: {str(e)}")
+                    # If that fails, check if it's multiple JSON objects separated by commas
+                    try:
+                        # Add array brackets and try to parse again
+                        wrapped_data = f"[{raw_data}]"
+                        parsed_data = json.loads(wrapped_data)
+                        logger.info("Successfully parsed multiple JSON objects by wrapping in array")
+                    except json.JSONDecodeError:
+                        logger.error(f"Failed to parse JSON from crew output: {raw_data}")
+                        return
             else:
                 parsed_data = raw_data
+                logger.info(f"Raw data is not string. Type: {type(parsed_data)}")
             
             # Convert to NewsEntity objects
             news_entities = []
@@ -104,19 +115,24 @@ class NewsSchedulerService:
             elif isinstance(parsed_data, dict):
                 # Single dictionary that needs to be converted to NewsEntity
                 try:
+                    logger.info(f"Processing single dictionary: {parsed_data.get('title', 'No title')}")
                     # Parse published_date string to datetime object
                     published_date_str = parsed_data.get('published_date', '')
+                    logger.info(f"Published date string: '{published_date_str}'")
                     if published_date_str:
                         # Clean the date string by removing (UTC) suffix
-                        cleaned_date_str = published_date_str.replace(' (UTC)', '').strip()
+                        cleaned_date_str = published_date_str.replace(' UTC', '').strip()
+                        logger.info(f"Cleaned date string: '{cleaned_date_str}'")
                         # Use dateutil parser to handle various datetime formats
                         published_date = parser.parse(cleaned_date_str)
                         # Ensure timezone is UTC
                         if published_date.tzinfo is None:
                             published_date = published_date.replace(tzinfo=pytz.UTC)
+                        logger.info(f"Parsed date: {published_date}")
                     else:
                         # Default to current time if no date provided
                         published_date = datetime.now(pytz.UTC)
+                        logger.info("Using current time as default published date")
                     
                     news_entity = NewsEntity(
                         title=parsed_data.get('title', ''),
