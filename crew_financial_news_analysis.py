@@ -2,8 +2,120 @@
 from crewai import Agent, Crew, Task, Process
 from crewai_tools import SerperDevTool, WebsiteSearchTool
 from models import NewsEntity
+from typing import List, Union
+from pydantic import BaseModel
+import json
+import re
+import logging
+from datetime import datetime
+import pytz
+from dateutil import parser
+
+class NewsAnalysisResult(BaseModel):
+    """Structured container for news analysis results"""
+    news_items: List[NewsEntity]
+
+logger = logging.getLogger(__name__)
 
 class FinancialNewsAnalysis:
+    
+    def extract_news_entities_from_result(self, result) -> List[NewsEntity]:
+        """
+        Post-process crew result to ensure clean list of NewsEntity objects
+        """
+        try:
+            # Extract raw data
+            if hasattr(result, 'raw'):
+                raw_data = result.raw
+            elif hasattr(result, 'output'):
+                raw_data = result.output
+            else:
+                raw_data = result
+            
+            # If it's already a NewsAnalysisResult, extract the news_items
+            if isinstance(raw_data, NewsAnalysisResult):
+                return raw_data.news_items
+            
+            # If it's already a list of NewsEntity objects
+            if isinstance(raw_data, list) and all(isinstance(item, NewsEntity) for item in raw_data):
+                return raw_data
+            
+            # If it's a string, try to parse JSON
+            if isinstance(raw_data, str):
+                # Clean the string - remove markdown, extra text, etc.
+                json_content = self._clean_json_string(raw_data)
+                
+                try:
+                    parsed = json.loads(json_content)
+                    
+                    # Handle NewsAnalysisResult format
+                    if isinstance(parsed, dict) and 'news_items' in parsed:
+                        news_data = parsed['news_items']
+                    elif isinstance(parsed, list):
+                        news_data = parsed
+                    else:
+                        news_data = [parsed]
+                    
+                    # Convert to NewsEntity objects
+                    news_entities = []
+                    for item in news_data:
+                        if isinstance(item, dict):
+                            try:
+                                # Validate and create NewsEntity
+                                news_entity = NewsEntity(**item)
+                                news_entities.append(news_entity)
+                            except Exception as e:
+                                logger.warning(f"Failed to create NewsEntity from {item}: {e}")
+                                continue
+                        elif isinstance(item, NewsEntity):
+                            news_entities.append(item)
+                    
+                    return news_entities
+                
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse JSON from crew result: {e}")
+                    return []
+            
+            # If it's a dict, try to extract news items
+            if isinstance(raw_data, dict):
+                if 'news_items' in raw_data:
+                    return self.extract_news_entities_from_result(raw_data['news_items'])
+                else:
+                    # Single news item
+                    try:
+                        return [NewsEntity(**raw_data)]
+                    except Exception as e:
+                        logger.error(f"Failed to create NewsEntity from dict: {e}")
+                        return []
+            
+            logger.error(f"Unexpected result type: {type(raw_data)}")
+            return []
+            
+        except Exception as e:
+            logger.error(f"Error extracting news entities: {e}")
+            return []
+    
+    def _clean_json_string(self, content: str) -> str:
+        """Clean JSON string from crew output"""
+        # Remove markdown code blocks
+        content = re.sub(r'```(?:json|javascript|js)?\s*\n?(.*?)\n?```', r'\1', content, flags=re.DOTALL | re.IGNORECASE)
+        
+        # Remove leading/trailing whitespace
+        content = content.strip()
+        
+        # Find JSON content (array or object)
+        if '[' in content:
+            start = content.find('[')
+            end = content.rfind(']')
+            if start != -1 and end != -1 and end > start:
+                content = content[start:end+1]
+        elif '{' in content:
+            start = content.find('{')
+            end = content.rfind('}')
+            if start != -1 and end != -1 and end > start:
+                content = content[start:end+1]
+        
+        return content
 
     researcher_agent = Agent(
             role="Financial News Researcher",
@@ -76,9 +188,17 @@ class FinancialNewsAnalysis:
             - Score 6-7: Moderate positive developments (partnership announcements, analyst upgrades)
             - Score -6 to -7: Moderate negative developments (missed guidance, competitive threats)
             - Score -8 to -10: Major negative catalysts (regulatory penalties, accounting issues, leadership departures)
+            
+            CRITICAL OUTPUT REQUIREMENTS:
+            - You MUST return ONLY a valid JSON array containing NewsEntity objects
+            - Do NOT include any explanatory text, thoughts, or reasoning in your response
+            - Do NOT wrap the JSON in markdown code blocks
+            - Do NOT add any commentary before or after the JSON
+            - The output must be a pure JSON array that can be directly parsed by json.loads()
+            - Each object must have exactly these fields: title, summarize, url, published_date, score, tickers
             """,
             expected_output="""
-            A list of News objects, with each article analyzed and structured conforming to the News Pydantic model:
+            RETURN ONLY THIS EXACT FORMAT - NO OTHER TEXT:
             [
                 {
                     "title": "Clear, descriptive headline",
@@ -87,12 +207,12 @@ class FinancialNewsAnalysis:
                     "published_date": "Publication date in YYYY-MM-DD HH:mm:ss format and timezone is UTC",
                     "score": "Integer from -10 to +10 representing market impact",
                     "tickers": ["List of affected stock symbols"]
-                },
-                ...
+                }
             ]
-            Analyze ALL provided URLs from the research task.
+            
+            IMPORTANT: Return only the JSON array above. No explanations, no markdown, no additional text.
             """,
-            output_pydantic=NewsEntity,
+            output_pydantic=NewsAnalysisResult,
             agent=analyst_agent,
             context=[research_task]
         )
@@ -104,7 +224,9 @@ class FinancialNewsAnalysis:
             agents=[self.researcher_agent, self.analyst_agent],
             tasks=[self.research_task, self.analyze_task],
             process=Process.sequential,
-            verbose=True
+            verbose=True,
+            output_log_file=False,  # Disable output logging to keep results clean
+            max_iter=1  # Single iteration to avoid multiple attempts that can add noise
         )
 
 if __name__ == "__main__":

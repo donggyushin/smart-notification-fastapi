@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import json
+import re
 from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -40,118 +41,15 @@ class NewsSchedulerService:
             if not result:
                 logger.warning("No news analysis results received")
                 return
-                
-            # Extract the actual data from CrewOutput object
-            if hasattr(result, 'raw'):
-                raw_data = result.raw
-            elif hasattr(result, 'output'):
-                raw_data = result.output
-            else:
-                raw_data = result
             
-            # Parse JSON string to list of dictionaries if needed
-            if isinstance(raw_data, str):
-                try:
-                    # First, try to parse as normal JSON
-                    parsed_data = json.loads(raw_data)
-                    logger.info(f"Successfully parsed JSON. Type: {type(parsed_data)}")
-                except json.JSONDecodeError as e:
-                    logger.error(f"JSON parse error: {str(e)}")
-                    # If that fails, check if it's multiple JSON objects separated by commas
-                    try:
-                        # Add array brackets and try to parse again
-                        wrapped_data = f"[{raw_data}]"
-                        parsed_data = json.loads(wrapped_data)
-                        logger.info("Successfully parsed multiple JSON objects by wrapping in array")
-                    except json.JSONDecodeError:
-                        logger.error(f"Failed to parse JSON from crew output: {raw_data}")
-                        return
-            else:
-                parsed_data = raw_data
-                logger.info(f"Raw data is not string. Type: {type(parsed_data)}")
-            
-            # Convert to NewsEntity objects
-            news_entities = []
-            
-            # Handle both single NewsEntity and list of NewsEntity objects
-            if isinstance(parsed_data, NewsEntity):
-                # Single NewsEntity object
-                news_entities = [parsed_data]
-            elif isinstance(parsed_data, list):
-                # List of items (could be NewsEntity objects or dictionaries)
-                for item in parsed_data:
-                    if isinstance(item, NewsEntity):
-                        # Already a NewsEntity object
-                        news_entities.append(item)
-                    elif isinstance(item, dict):
-                        # Dictionary that needs to be converted to NewsEntity
-                        try:
-                            # Parse published_date string to datetime object
-                            published_date_str = item.get('published_date', '')
-                            if published_date_str:
-                                # Clean the date string by removing (UTC) suffix
-                                cleaned_date_str = published_date_str.replace(' (UTC)', '').strip()
-                                # Use dateutil parser to handle various datetime formats
-                                published_date = parser.parse(cleaned_date_str)
-                                # Ensure timezone is UTC
-                                if published_date.tzinfo is None:
-                                    published_date = published_date.replace(tzinfo=pytz.UTC)
-                            else:
-                                # Default to current time if no date provided
-                                published_date = datetime.now(pytz.UTC)
-                            
-                            news_entity = NewsEntity(
-                                title=item.get('title', ''),
-                                summarize=item.get('summarize', ''),
-                                url=item.get('url', ''),
-                                published_date=published_date,
-                                score=item.get('score', 0),
-                                tickers=item.get('tickers', [])
-                            )
-                            news_entities.append(news_entity)
-                        except Exception as e:
-                            logger.error(f"Failed to parse news item: {item}. Error: {str(e)}")
-                            continue
-            elif isinstance(parsed_data, dict):
-                # Single dictionary that needs to be converted to NewsEntity
-                try:
-                    logger.info(f"Processing single dictionary: {parsed_data.get('title', 'No title')}")
-                    # Parse published_date string to datetime object
-                    published_date_str = parsed_data.get('published_date', '')
-                    logger.info(f"Published date string: '{published_date_str}'")
-                    if published_date_str:
-                        # Clean the date string by removing (UTC) suffix
-                        cleaned_date_str = published_date_str.replace(' UTC', '').strip()
-                        logger.info(f"Cleaned date string: '{cleaned_date_str}'")
-                        # Use dateutil parser to handle various datetime formats
-                        published_date = parser.parse(cleaned_date_str)
-                        # Ensure timezone is UTC
-                        if published_date.tzinfo is None:
-                            published_date = published_date.replace(tzinfo=pytz.UTC)
-                        logger.info(f"Parsed date: {published_date}")
-                    else:
-                        # Default to current time if no date provided
-                        published_date = datetime.now(pytz.UTC)
-                        logger.info("Using current time as default published date")
-                    
-                    news_entity = NewsEntity(
-                        title=parsed_data.get('title', ''),
-                        summarize=parsed_data.get('summarize', ''),
-                        url=parsed_data.get('url', ''),
-                        published_date=published_date,
-                        score=parsed_data.get('score', 0),
-                        tickers=parsed_data.get('tickers', [])
-                    )
-                    news_entities = [news_entity]
-                except Exception as e:
-                    logger.error(f"Failed to parse single news item: {parsed_data}. Error: {str(e)}")
-            else:
-                logger.error(f"Unexpected data type from crew output: {type(parsed_data)}")
-                return
+            # Use the new extraction method to ensure clean NewsEntity list
+            news_entities = analysis.extract_news_entities_from_result(result)
             
             if not news_entities:
-                logger.warning("No valid news entities found after parsing")
+                logger.warning("No valid news entities extracted from crew result")
                 return
+                
+            logger.info(f"Successfully extracted {len(news_entities)} news entities")
                 
             logger.info(f"Analysis completed. Processing {len(news_entities)} news items...")
             
