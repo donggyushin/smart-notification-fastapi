@@ -1,6 +1,7 @@
+#!/usr/bin/env python3
 
 from crewai import Agent, Crew, Task, Process
-from crewai_tools import SerperDevTool, WebsiteSearchTool
+from crewai_tools import WebsiteSearchTool
 from crewai.tools import BaseTool
 from models import NewsEntity
 from typing import List
@@ -53,7 +54,6 @@ class YFinanceNewsTool(BaseTool):
                                     published_timestamp = 0
                                     if pub_date:
                                         try:
-                                            from datetime import datetime
                                             dt = datetime.fromisoformat(pub_date.replace('Z', '+00:00'))
                                             published_timestamp = dt.timestamp()
                                         except:
@@ -229,73 +229,72 @@ class FinancialNewsAnalysis:
 
         return content
 
-    researcher_agent = Agent(
-            role="Financial News Researcher",
-            goal="Discover and curate high-impact financial news that could significantly influence US stock market movements and investor sentiment, with strong emphasis on RECENT and BREAKING news",
-            backstory="You are an experienced financial journalist with 15+ years covering Wall Street. You have an exceptional ability to identify breaking news, earnings reports, regulatory changes, and market-moving events before they become mainstream. Your network spans across major financial institutions, and you understand which news sources deliver the most reliable and timely market intelligence. You ALWAYS prioritize the most recent news as market impact diminishes rapidly with time - news older than 24-48 hours is rarely actionable for trading decisions.",
-            inject_date=True, # Automatically inject current date into tasks
-            reasoning=True,
-            tools=[YFinanceNewsTool()],
-            llm="gpt-5",
-            verbose=True
-        )
+    def get_real_news_data(self) -> List[dict]:
+        """Get real news data with URLs and metadata directly from YFinanceNewsTool"""
+        tool = YFinanceNewsTool()
+        all_news = []
+        seen_urls = set()
+
+        # The exact queries the researcher should use
+        queries = [
+            "general",
+            "AAPL,MSFT,GOOGL,AMZN,TSLA",
+            "JPM,BAC,WFC,GS,MS",
+            "JNJ,PFE,MRNA,ABBV",
+            "XOM,CVX,COP"
+        ]
+
+        for query in queries:
+            try:
+                result = tool._run(query)
+                news_data = json.loads(result)
+
+                for item in news_data:
+                    url = item.get('url', '')
+                    if url and url not in seen_urls:  # Deduplicate
+                        seen_urls.add(url)
+                        all_news.append(item)
+
+            except Exception as e:
+                logger.error(f"Error fetching {query}: {e}")
+
+        return all_news[:20]  # Return top 20
 
     analyst_agent = Agent(
-            role="Financial News Analyst",
-            goal="Transform raw financial news into actionable insights by analyzing market impact, identifying affected securities, and providing precise sentiment scoring with comprehensive summaries, with STRONG emphasis on news recency",
-            backstory="You are a seasoned equity research analyst with deep expertise in fundamental and technical analysis. Having worked at top-tier investment banks for over a decade, you excel at quickly parsing complex financial information, identifying key market drivers, and quantifying potential stock price impacts. Your analytical framework combines quantitative metrics with qualitative assessment to deliver precise investment insights. You understand that NEWS RECENCY IS CRITICAL - older news has diminished market impact, and you automatically reduce scores for news older than 24 hours, with significant penalties for news older than 48 hours.",
-            inject_date=True, # Automatically inject current date into tasks
-            reasoning=True,
-            tools=[WebsiteSearchTool()],
-            llm="gpt-5",
-            verbose=True
-        )
+        role="Financial News Analyst",
+        goal="Transform raw financial news into actionable insights by analyzing market impact, identifying affected securities, and providing precise sentiment scoring with comprehensive summaries, with STRONG emphasis on news recency",
+        backstory="You are a seasoned equity research analyst with deep expertise in fundamental and technical analysis. Having worked at top-tier investment banks for over a decade, you excel at quickly parsing complex financial information, identifying key market drivers, and quantifying potential stock price impacts. Your analytical framework combines quantitative metrics with qualitative assessment to deliver precise investment insights. You understand that NEWS RECENCY IS CRITICAL - older news has diminished market impact, and you automatically reduce scores for news older than 24 hours, with significant penalties for news older than 48 hours.",
+        inject_date=True, # Automatically inject current date into tasks
+        reasoning=True,
+        tools=[WebsiteSearchTool(), YFinanceNewsTool()],
+        llm="gpt-5",
+        verbose=True
+    )
 
-    research_task = Task(
-            description="""
-            Use the YFinanceNewsTool to fetch REAL financial news URLs from Yahoo Finance.
+    def create_analyze_task(self, news_data: List[dict]) -> Task:
+        """Create analyze task with real news data including URLs and metadata"""
 
-            STEP-BY-STEP PROCESS:
-            1. First, use YFinanceNewsTool with query="general" to get general market news from major indices (S&P 500, NASDAQ, Dow Jones)
-            2. Then, use YFinanceNewsTool with specific major tickers to get company-specific news:
-               - "AAPL,MSFT,GOOGL,AMZN,TSLA" (Big Tech)
-               - "JPM,BAC,WFC,GS,MS" (Major Banks)
-               - "JNJ,PFE,MRNA,ABBV" (Healthcare/Pharma)
-               - "XOM,CVX,COP" (Energy)
+        # Extract just URLs for backward compatibility
+        urls = [item['url'] for item in news_data]
 
-            CRITICAL REQUIREMENTS:
-            - ONLY use URLs returned by the YFinanceNewsTool
-            - Do NOT generate, create, or fabricate any URLs
-            - All URLs must be real, working links from Yahoo Finance news sources
-            - Focus on news from the last 24-48 hours (tool automatically filters for recency)
-            - Prioritize high-impact news (earnings, mergers, regulatory changes, Fed announcements)
+        # Format the news data for the agent
+        news_data_text = json.dumps(news_data, indent=2)
 
-            The tool returns JSON with news items containing:
-            - title: News headline
-            - url: REAL working URL to the news article
-            - published: Timestamp of publication
-            - source: News publisher
-            """,
-            expected_output="""
-            A JSON array of REAL URLs extracted from Yahoo Finance:
-            [
-                "https://finance.yahoo.com/news/actual-article-1",
-                "https://finance.yahoo.com/news/actual-article-2",
-                "https://www.reuters.com/real-article-3"
-            ]
+        return Task(
+            description=f"""
+            IMPORTANT: You have been provided with REAL news data from Yahoo Finance with accurate timestamps:
+            {news_data_text}
 
-            IMPORTANT:
-            - Only include URLs that were returned by YFinanceNewsTool
-            - Each URL must be real and working
-            - Prioritize the most recent and high-impact news
-            - Return 15-20 URLs maximum
-            """,
-            agent=researcher_agent
-        )
+            Each news item contains:
+            - title: The news headline
+            - url: The REAL Yahoo Finance URL (use this exact URL)
+            - published: Unix timestamp of publication (use this for accurate published_date)
+            - source: The news source/publisher
+            - ticker: Associated stock ticker (if any)
 
-    analyze_task = Task(
-            description="""
-            Using the URLs provided by the research task, perform deep analysis of each news URL to extract actionable investment insights:
+            You must analyze each of these EXACT URLs and create a NewsEntity for each one.
+
+            Using the URLs provided above, perform deep analysis of each news URL to extract actionable investment insights:
 
             1. Content Analysis:
                - Read full article content, comments, and engagement metrics
@@ -336,6 +335,15 @@ class FinancialNewsAnalysis:
             - Do NOT add any commentary before or after the JSON
             - The output must be a pure JSON array that can be directly parsed by json.loads()
             - Each object must have exactly these fields: title, summarize, url, published_date, score, tickers
+
+            URL AND TIMESTAMP REQUIREMENTS:
+            - CRITICAL: You must use the EXACT same URLs that were provided above
+            - Do NOT modify, change, or generate new URLs
+            - The "url" field must be one of the URLs from the news data above
+            - NEVER create fake or synthetic URLs
+            - CRITICAL: Use the "published" timestamp from the news data above to calculate the correct published_date
+            - Convert the Unix timestamp to YYYY-MM-DD HH:MM:SS format
+            - Do NOT try to scrape or guess the publication date from web pages
             """,
             expected_output="""
             RETURN ONLY THIS EXACT FORMAT - NO OTHER TEXT:
@@ -343,26 +351,38 @@ class FinancialNewsAnalysis:
                 {
                     "title": "Clear, descriptive headline",
                     "summarize": "Concise 2-3 sentence investment summary",
-                    "url": "Original news source URL",
-                    "published_date": "Publication date in YYYY-MM-DD HH:mm:ss format and timezone is UTC. Hours, minutes are mandatory if possible. Seconds could be 00.",
+                    "url": "EXACT URL from the provided news data - DO NOT CHANGE OR GENERATE",
+                    "published_date": "Convert the 'published' timestamp to YYYY-MM-DD HH:MM:SS format",
                     "score": "Integer from -10 to +10 representing market impact",
                     "tickers": ["List of affected stock symbols"]
                 }
             ]
 
-            IMPORTANT: Return only the JSON array above. No explanations, no markdown, no additional text.
+            CRITICAL:
+            - Use the EXACT URLs provided in the task description
+            - Do NOT create or modify URLs in any way
+            - Return only the JSON array above. No explanations, no markdown, no additional text.
             """,
             output_pydantic=NewsAnalysisResult,
-            agent=analyst_agent,
-            context=[research_task]
+            agent=self.analyst_agent
         )
 
-
     def crew(self) -> Crew:
+        # Get real news data with URLs and metadata
+        real_news_data = self.get_real_news_data()
+
+        if not real_news_data:
+            logger.error("No real news data found!")
+            return None
+
+        logger.info(f"Found {len(real_news_data)} real news items for analysis")
+
+        # Create analyze task with real news data
+        analyze_task = self.create_analyze_task(real_news_data)
 
         return Crew(
-            agents=[self.researcher_agent, self.analyst_agent],
-            tasks=[self.research_task, self.analyze_task],
+            agents=[self.analyst_agent],
+            tasks=[analyze_task],
             process=Process.sequential,
             verbose=True,
             output_log_file=False,  # Disable output logging to keep results clean
@@ -371,5 +391,9 @@ class FinancialNewsAnalysis:
 
 if __name__ == "__main__":
     analysis = FinancialNewsAnalysis()
-    result = analysis.crew().kickoff()
-    print(result)
+    crew = analysis.crew()
+    if crew:
+        result = crew.kickoff()
+        print(result)
+    else:
+        print("Failed to create crew - no real URLs found")

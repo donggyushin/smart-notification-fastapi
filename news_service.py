@@ -184,12 +184,49 @@ def get_news_feed_with_cursor(
 def get_news_by_id(db: Session, news_id: int) -> NewsAnalysis:
     """
     Retrieve a single news item by its ID.
-    
+
     Args:
         db: Database session
         news_id: ID of the news item to retrieve
-        
+
     Returns:
         NewsAnalysis record or None if not found
     """
     return db.query(NewsAnalysis).filter(NewsAnalysis.id == news_id).first()
+
+def clear_all_news_analysis(db: Session) -> dict:
+    """
+    Delete all news analysis records from the database.
+    Used for cleaning up fake or test data.
+
+    Args:
+        db: Database session
+
+    Returns:
+        dict: Summary of the deletion operation
+    """
+    try:
+        # Count existing records before deletion
+        count_before = db.query(NewsAnalysis).count()
+
+        # Delete all news analysis records
+        deleted_count = db.query(NewsAnalysis).delete()
+        db.commit()
+
+        # Verify deletion
+        count_after = db.query(NewsAnalysis).count()
+
+        result = {
+            "records_deleted": deleted_count,
+            "count_before": count_before,
+            "count_after": count_after,
+            "status": "success"
+        }
+
+        logger.info(f"Cleared all news analysis data: {result}")
+        return result
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to clear news analysis data: {str(e)}")
+        raise e

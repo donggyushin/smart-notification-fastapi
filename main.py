@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from database import get_db, engine, Base
 from models import DeviceCreate, DeviceResponse, NewsFeedResponse, NewsResponse
 from device_service import register_device, get_active_devices, get_device_tokens
-from news_service import get_news_feed_with_cursor, get_news_by_id
+from news_service import get_news_feed_with_cursor, get_news_by_id, clear_all_news_analysis
 from scheduler_service import news_scheduler
 from firebase_service import firebase_service
 
@@ -126,6 +126,23 @@ async def trigger_news_analysis():
         return {"message": "News analysis task started in background"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to trigger news analysis: {str(e)}")
+
+@app.delete("/admin/news/clear-all")
+async def clear_all_news_analysis_endpoint(db: Session = Depends(get_db)):
+    """모든 뉴스 분석 데이터 삭제 (관리자용) - 가짜 데이터 정리용"""
+    try:
+        result = clear_all_news_analysis(db)
+
+        return {
+            "message": "All news analysis data has been cleared successfully",
+            "records_deleted": result["records_deleted"],
+            "records_remaining": result["count_after"],
+            "status": result["status"]
+        }
+
+    except Exception as e:
+        logging.error(f"Failed to clear news analysis data: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to clear news analysis data: {str(e)}")
 
 @app.post("/admin/test/push-notification")
 async def test_push_notification(
