@@ -1,18 +1,133 @@
 
 from crewai import Agent, Crew, Task, Process
 from crewai_tools import SerperDevTool, WebsiteSearchTool
+from crewai.tools import BaseTool
 from models import NewsEntity
 from typing import List
 from pydantic import BaseModel
 import json
 import re
 import logging
+import yfinance as yf
+from datetime import datetime, timedelta
 
 class NewsAnalysisResult(BaseModel):
     """Structured container for news analysis results"""
     news_items: List[NewsEntity]
 
 logger = logging.getLogger(__name__)
+
+class YFinanceNewsTool(BaseTool):
+    name: str = "YFinance News Tool"
+    description: str = "Fetches real financial news from Yahoo Finance for major tickers and market news"
+
+    def _run(self, query: str = "general") -> str:
+        """
+        Fetch real news from Yahoo Finance
+        Args:
+            query: Either 'general' for market news or specific ticker symbols
+        """
+        try:
+            news_items = []
+
+            if query.lower() == "general":
+                # Get general market news from major indices and popular stocks
+                tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META"]
+                for ticker in tickers:
+                    try:
+                        stock = yf.Ticker(ticker)
+                        news = stock.news
+                        for item in news[:3]:  # Get top 3 news per ticker
+                            content = item.get("content", {})
+                            if content:
+                                # Parse the new yfinance structure
+                                url = ""
+                                if content.get("clickThroughUrl"):
+                                    url = content["clickThroughUrl"].get("url", "")
+                                elif content.get("canonicalUrl"):
+                                    url = content["canonicalUrl"].get("url", "")
+
+                                if url and content.get("title"):
+                                    # Parse publication date
+                                    pub_date = content.get("pubDate", "")
+                                    published_timestamp = 0
+                                    if pub_date:
+                                        try:
+                                            from datetime import datetime
+                                            dt = datetime.fromisoformat(pub_date.replace('Z', '+00:00'))
+                                            published_timestamp = dt.timestamp()
+                                        except:
+                                            published_timestamp = datetime.now().timestamp()
+
+                                    news_items.append({
+                                        "title": content["title"],
+                                        "url": url,
+                                        "published": published_timestamp,
+                                        "source": content.get("provider", {}).get("displayName", "Yahoo Finance"),
+                                        "ticker": ticker
+                                    })
+                    except Exception as e:
+                        logger.warning(f"Error fetching news for {ticker}: {e}")
+                        continue
+            else:
+                # Get news for specific tickers
+                tickers = [t.strip().upper() for t in query.split(",")]
+                for ticker in tickers[:10]:  # Limit to 10 tickers
+                    try:
+                        stock = yf.Ticker(ticker)
+                        news = stock.news
+                        for item in news[:3]:  # Get top 3 news per ticker
+                            content = item.get("content", {})
+                            if content:
+                                # Parse the new yfinance structure
+                                url = ""
+                                if content.get("clickThroughUrl"):
+                                    url = content["clickThroughUrl"].get("url", "")
+                                elif content.get("canonicalUrl"):
+                                    url = content["canonicalUrl"].get("url", "")
+
+                                if url and content.get("title"):
+                                    # Parse publication date
+                                    pub_date = content.get("pubDate", "")
+                                    published_timestamp = 0
+                                    if pub_date:
+                                        try:
+                                            dt = datetime.fromisoformat(pub_date.replace('Z', '+00:00'))
+                                            published_timestamp = dt.timestamp()
+                                        except:
+                                            published_timestamp = datetime.now().timestamp()
+
+                                    news_items.append({
+                                        "title": content["title"],
+                                        "url": url,
+                                        "published": published_timestamp,
+                                        "source": content.get("provider", {}).get("displayName", "Yahoo Finance"),
+                                        "ticker": ticker
+                                    })
+                    except Exception as e:
+                        logger.warning(f"Error fetching news for {ticker}: {e}")
+                        continue
+
+            # Filter for recent news (last 48 hours)
+            cutoff_time = datetime.now().timestamp() - (48 * 3600)
+            recent_news = [item for item in news_items if item.get("published", 0) > cutoff_time]
+
+            # Remove duplicates by URL
+            seen_urls = set()
+            unique_news = []
+            for item in recent_news:
+                if item["url"] and item["url"] not in seen_urls:
+                    seen_urls.add(item["url"])
+                    unique_news.append(item)
+
+            # Sort by publication time (newest first)
+            unique_news.sort(key=lambda x: x.get("published", 0), reverse=True)
+
+            return json.dumps(unique_news[:20])  # Return top 20 unique news items
+
+        except Exception as e:
+            logger.error(f"Error fetching Yahoo Finance news: {e}")
+            return json.dumps([])
 
 class FinancialNewsAnalysis:
 
@@ -120,7 +235,7 @@ class FinancialNewsAnalysis:
             backstory="You are an experienced financial journalist with 15+ years covering Wall Street. You have an exceptional ability to identify breaking news, earnings reports, regulatory changes, and market-moving events before they become mainstream. Your network spans across major financial institutions, and you understand which news sources deliver the most reliable and timely market intelligence. You ALWAYS prioritize the most recent news as market impact diminishes rapidly with time - news older than 24-48 hours is rarely actionable for trading decisions.",
             inject_date=True, # Automatically inject current date into tasks
             reasoning=True,
-            tools=[SerperDevTool()],
+            tools=[YFinanceNewsTool()],
             llm="gpt-5",
             verbose=True
         )
@@ -138,32 +253,42 @@ class FinancialNewsAnalysis:
 
     research_task = Task(
             description="""
-            Conduct comprehensive research to identify 15-20 recent financial news articles that could significantly impact US stock market performance.
+            Use the YFinanceNewsTool to fetch REAL financial news URLs from Yahoo Finance.
 
-            CRITICAL RECENCY REQUIREMENTS:
-            - ONLY search for news from the last 24-48 hours using terms like "today", "latest", "breaking", "just announced"
-            - Use time-specific search queries: "earnings today", "Fed announcement today", "breaking news stock market"
-            - Explicitly filter out any news older than 2 days
-            - Prioritize "breaking news" and "just in" sources over general financial news
+            STEP-BY-STEP PROCESS:
+            1. First, use YFinanceNewsTool with query="general" to get general market news from major indices (S&P 500, NASDAQ, Dow Jones)
+            2. Then, use YFinanceNewsTool with specific major tickers to get company-specific news:
+               - "AAPL,MSFT,GOOGL,AMZN,TSLA" (Big Tech)
+               - "JPM,BAC,WFC,GS,MS" (Major Banks)
+               - "JNJ,PFE,MRNA,ABBV" (Healthcare/Pharma)
+               - "XOM,CVX,COP" (Energy)
 
-            Focus on:
-            - Breaking earnings reports and guidance updates (TODAY'S releases)
-            - Federal Reserve policy announcements and economic indicators (LATEST)
-            - Major corporate mergers, acquisitions, and strategic partnerships (RECENT announcements)
-            - Regulatory changes and government policy shifts (JUST announced)
-            - Geopolitical events affecting market sentiment (CURRENT developments)
-            - Sector-specific developments in technology, healthcare, finance, and energy (TODAY'S news)
+            CRITICAL REQUIREMENTS:
+            - ONLY use URLs returned by the YFinanceNewsTool
+            - Do NOT generate, create, or fabricate any URLs
+            - All URLs must be real, working links from Yahoo Finance news sources
+            - Focus on news from the last 24-48 hours (tool automatically filters for recency)
+            - Prioritize high-impact news (earnings, mergers, regulatory changes, Fed announcements)
 
-            Filter and prioritize news based on: 1) RECENCY (most important), 2) potential market impact, 3) credibility of source, and 4) relevance to major publicly traded companies.
+            The tool returns JSON with news items containing:
+            - title: News headline
+            - url: REAL working URL to the news article
+            - published: Timestamp of publication
+            - source: News publisher
             """,
             expected_output="""
-            A curated list of high-impact financial news URLs in the following format:
+            A JSON array of REAL URLs extracted from Yahoo Finance:
             [
-                "https://example.com/news1",
-                "https://example.com/news2",
-                ...
+                "https://finance.yahoo.com/news/actual-article-1",
+                "https://finance.yahoo.com/news/actual-article-2",
+                "https://www.reuters.com/real-article-3"
             ]
-            Each URL should represent news with significant potential to move individual stocks or broader market indices.
+
+            IMPORTANT:
+            - Only include URLs that were returned by YFinanceNewsTool
+            - Each URL must be real and working
+            - Prioritize the most recent and high-impact news
+            - Return 15-20 URLs maximum
             """,
             agent=researcher_agent
         )
