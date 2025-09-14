@@ -102,10 +102,11 @@ def get_device_tokens(db: Session, active_only: bool = True) -> List[str]:
         active_only: If True, return only active devices' tokens
         
     Returns:
-        List[str]: List of FCM tokens
+        List[str]: List of unique FCM tokens
     """
     query = db.query(Device.fcm_token)
     if active_only:
         query = query.filter(Device.is_active == True)
     
-    return [token[0] for token in query.all()]
+    tokens = [token[0] for token in query.all()]
+    return list(set(tokens))
