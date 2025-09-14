@@ -311,7 +311,7 @@ class FinancialNewsAnalysis:
             3. Summary Creation:
                - Create concise, investor-focused summary (2-3 sentences)
                - Highlight the most critical information for trading decisions
-               - Include publication date and source credibility assessment
+               - Focus on market impact and investment implications only
 
             Scoring Guidelines (BEFORE applying recency penalty):
             - Score 8-10: Major positive catalysts (earnings beats, breakthrough products, favorable regulations)
@@ -350,7 +350,7 @@ class FinancialNewsAnalysis:
             [
                 {
                     "title": "Clear, descriptive headline",
-                    "summarize": "Concise 2-3 sentence investment summary",
+                    "summarize": "Concise 2-3 sentence investment summary focusing on market impact only",
                     "url": "EXACT URL from the provided news data - DO NOT CHANGE OR GENERATE",
                     "published_date": "Convert the 'published' timestamp to YYYY-MM-DD HH:MM:SS format",
                     "score": "Integer from -10 to +10 representing market impact",
