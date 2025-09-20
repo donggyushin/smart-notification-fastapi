@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from database import get_db, engine, Base
 from models import DeviceCreate, DeviceResponse, NewsFeedResponse, NewsResponse
 from device_service import register_device, get_active_devices, get_device_tokens
-from news_service import get_news_feed_with_cursor, get_news_by_id, clear_all_news_analysis, update_news_save_status
+from news_service import get_news_feed_with_cursor, get_news_by_id, clear_all_news_analysis, update_news_save_status, get_saved_news_feed_with_cursor
 from scheduler_service import news_scheduler
 from firebase_service import firebase_service
 
@@ -86,6 +86,32 @@ async def get_news_feed_endpoint(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch news feed: {str(e)}")
+
+@app.get("/news/saved/feed", response_model=NewsFeedResponse)
+async def get_saved_news_feed_endpoint(
+    db: Session = Depends(get_db),
+    cursor_id: Optional[int] = Query(None, description="Cursor ID for pagination (last item ID from previous request)"),
+    limit: int = Query(20, ge=1, le=100, description="Number of items to return (1-100)"),
+    min_score: Optional[int] = Query(None, ge=-10, le=10, description="Minimum score filter (-10 to 10)"),
+    max_score: Optional[int] = Query(None, ge=-10, le=10, description="Maximum score filter (-10 to 10)")
+):
+    """저장된 뉴스 피드 조회 (무한 스크롤 지원)"""
+    try:
+        # Validate score range
+        if min_score is not None and max_score is not None and min_score > max_score:
+            raise HTTPException(status_code=400, detail="min_score cannot be greater than max_score")
+
+        result = get_saved_news_feed_with_cursor(
+            db=db,
+            cursor_id=cursor_id,
+            limit=limit,
+            min_score=min_score,
+            max_score=max_score
+        )
+        return result
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch saved news feed: {str(e)}")
 
 @app.get("/news/{news_id}", response_model=NewsResponse)
 async def get_news_item_endpoint(news_id: int, db: Session = Depends(get_db)):

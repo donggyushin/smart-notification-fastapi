@@ -196,6 +196,79 @@ def get_news_by_id(db: Session, news_id: int) -> NewsAnalysis:
     """
     return db.query(NewsAnalysis).filter(NewsAnalysis.id == news_id).first()
 
+def get_saved_news_feed_with_cursor(
+    db: Session,
+    cursor_id: int = None,
+    limit: int = 20,
+    min_score: int = None,
+    max_score: int = None
+) -> dict:
+    """
+    Get saved news feed using cursor-based pagination for infinite scroll.
+
+    Args:
+        db: Database session
+        cursor_id: Last news ID from previous request (for next page)
+        limit: Number of items to return
+        min_score: Minimum score filter (inclusive)
+        max_score: Maximum score filter (inclusive)
+
+    Returns:
+        dict: Cursor-based paginated saved news data
+        {
+            "items": List[NewsAnalysis],
+            "next_cursor_id": int or None,
+            "has_more": bool,
+            "limit": int
+        }
+    """
+    # Build base query for saved news only
+    query = db.query(NewsAnalysis).filter(NewsAnalysis.save == True)
+
+    # Apply score filters
+    if min_score is not None:
+        query = query.filter(NewsAnalysis.score >= min_score)
+    if max_score is not None:
+        query = query.filter(NewsAnalysis.score <= max_score)
+
+    # Apply cursor filter (get items with ID less than cursor for descending order)
+    if cursor_id is not None:
+        query = query.filter(NewsAnalysis.id < cursor_id)
+
+    # Order by ID descending (newest first) and get one extra to check if there's more
+    items = query.order_by(NewsAnalysis.id.desc()).limit(limit + 1).all()
+
+    # Check if there are more items
+    has_more = len(items) > limit
+    if has_more:
+        items = items[:limit]  # Remove the extra item
+
+    # Get next cursor (ID of last item)
+    next_cursor_id = items[-1].id if items and has_more else None
+
+    # Convert datetime objects to strings for API response
+    serialized_items = []
+    for item in items:
+        item_dict = {
+            "id": item.id,
+            "title": item.title,
+            "summarize": item.summarize,
+            "url": item.url,
+            "published_date": item.published_date.isoformat() if hasattr(item.published_date, 'isoformat') else item.published_date,
+            "score": item.score,
+            "tickers": item.tickers,
+            "save": item.save,
+            "created_at": item.created_at.isoformat()
+        }
+        serialized_items.append(item_dict)
+
+    return {
+        "items": serialized_items,
+        "next_cursor_id": next_cursor_id,
+        "has_more": has_more,
+        "limit": limit
+    }
+
 def update_news_save_status(db: Session, news_id: int, save: bool) -> NewsAnalysis:
     """
     Update the save status of a news item.
