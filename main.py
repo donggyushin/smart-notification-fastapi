@@ -104,6 +104,7 @@ async def get_news_item_endpoint(news_id: int, db: Session = Depends(get_db)):
             published_date=news_item.published_date,
             score=news_item.score,
             tickers=news_item.tickers,
+            save=news_item.save,
             created_at=news_item.created_at.isoformat()
         )
     except HTTPException:

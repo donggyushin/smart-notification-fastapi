@@ -40,7 +40,8 @@ def save_news_analysis(news_list: List[NewsEntity]) -> dict:
                     url=news_item.url,
                     published_date=news_item.published_date,
                     score=news_item.score,
-                    tickers=news_item.tickers
+                    tickers=news_item.tickers,
+                    save=news_item.save
                 )
                 
                 db.add(db_news)
@@ -170,6 +171,7 @@ def get_news_feed_with_cursor(
             "published_date": item.published_date.isoformat() if hasattr(item.published_date, 'isoformat') else item.published_date,
             "score": item.score,
             "tickers": item.tickers,
+            "save": item.save,
             "created_at": item.created_at.isoformat()
         }
         serialized_items.append(item_dict)
