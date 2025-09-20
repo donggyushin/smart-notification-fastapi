@@ -20,7 +20,7 @@ class Device(Base):
 # SQLAlchemy model for database storage
 class NewsAnalysis(Base):
     __tablename__ = "news_analysis"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     title = Column(Text, nullable=False)
     summarize = Column(Text, nullable=False)
@@ -28,6 +28,7 @@ class NewsAnalysis(Base):
     published_date = Column(DateTime(timezone=True), nullable=False)
     score = Column(Integer, nullable=False)
     tickers = Column(JSON, nullable=False)  # Store list of tickers as JSON
+    save = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     
@@ -50,12 +51,13 @@ class DeviceResponse(BaseModel):
 # Pydantic models for News API responses
 class NewsResponse(BaseModel):
     id: int
-    title: str 
-    summarize: str 
-    url: str 
-    published_date: datetime 
-    score: int 
+    title: str
+    summarize: str
+    url: str
+    published_date: datetime
+    score: int
     tickers: List[str]
+    save: bool
     created_at: str
     
     class Config:
@@ -69,9 +71,10 @@ class NewsFeedResponse(BaseModel):
 
 # Pydantic model for API responses and CrewAI output
 class NewsEntity(BaseModel):
-    title: str 
-    summarize: str 
-    url: str 
-    published_date: datetime 
-    score: int 
+    title: str
+    summarize: str
+    url: str
+    published_date: datetime
+    score: int
     tickers: List[str]
+    save: bool = False
