@@ -196,6 +196,30 @@ def get_news_by_id(db: Session, news_id: int) -> NewsAnalysis:
     """
     return db.query(NewsAnalysis).filter(NewsAnalysis.id == news_id).first()
 
+def update_news_save_status(db: Session, news_id: int, save: bool) -> NewsAnalysis:
+    """
+    Update the save status of a news item.
+
+    Args:
+        db: Database session
+        news_id: ID of the news item to update
+        save: New save status (True for saved, False for unsaved)
+
+    Returns:
+        Updated NewsAnalysis record or None if not found
+    """
+    news_item = db.query(NewsAnalysis).filter(NewsAnalysis.id == news_id).first()
+
+    if not news_item:
+        return None
+
+    news_item.save = save
+    db.commit()
+    db.refresh(news_item)
+
+    logger.info(f"Updated save status for news ID {news_id} to {save}")
+    return news_item
+
 def clear_all_news_analysis(db: Session) -> dict:
     """
     Delete all news analysis records from the database.

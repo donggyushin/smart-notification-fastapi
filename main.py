@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from database import get_db, engine, Base
 from models import DeviceCreate, DeviceResponse, NewsFeedResponse, NewsResponse
 from device_service import register_device, get_active_devices, get_device_tokens
-from news_service import get_news_feed_with_cursor, get_news_by_id, clear_all_news_analysis
+from news_service import get_news_feed_with_cursor, get_news_by_id, clear_all_news_analysis, update_news_save_status
 from scheduler_service import news_scheduler
 from firebase_service import firebase_service
 
@@ -111,6 +111,62 @@ async def get_news_item_endpoint(news_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch news item: {str(e)}")
+
+@app.post("/news/{news_id}/save", response_model=NewsResponse)
+async def save_news_endpoint(
+    news_id: int,
+    db: Session = Depends(get_db)
+):
+    """뉴스 아이템 저장"""
+    try:
+        updated_news = update_news_save_status(db, news_id, True)
+        if not updated_news:
+            raise HTTPException(status_code=404, detail="News item not found")
+
+        # Convert to response format
+        return NewsResponse(
+            id=updated_news.id,
+            title=updated_news.title,
+            summarize=updated_news.summarize,
+            url=updated_news.url,
+            published_date=updated_news.published_date,
+            score=updated_news.score,
+            tickers=updated_news.tickers,
+            save=updated_news.save,
+            created_at=updated_news.created_at.isoformat()
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save news item: {str(e)}")
+
+@app.delete("/news/{news_id}/save", response_model=NewsResponse)
+async def unsave_news_endpoint(
+    news_id: int,
+    db: Session = Depends(get_db)
+):
+    """뉴스 아이템 저장 해제"""
+    try:
+        updated_news = update_news_save_status(db, news_id, False)
+        if not updated_news:
+            raise HTTPException(status_code=404, detail="News item not found")
+
+        # Convert to response format
+        return NewsResponse(
+            id=updated_news.id,
+            title=updated_news.title,
+            summarize=updated_news.summarize,
+            url=updated_news.url,
+            published_date=updated_news.published_date,
+            score=updated_news.score,
+            tickers=updated_news.tickers,
+            save=updated_news.save,
+            created_at=updated_news.created_at.isoformat()
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to unsave news item: {str(e)}")
 
 @app.get("/admin/scheduler/status")
 async def get_scheduler_status():
